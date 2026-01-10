@@ -7,7 +7,7 @@
 		"build": "swc src -d dist --strip-leading-paths",
 		"build:type": "tsc",
 		"start": "node --enable-source-maps dist/index.js",
-		"start:dev": "tsx ./src/index.ts",
+		"start:dev": "tsx --env-file .env ./src/index.ts",
 		"format": "prettier --write ."
 	},
 	"devDependencies": {
