@@ -21,6 +21,7 @@
           packages = [
             nodejs
             pnpm
+            litecli
           ];
         };
       }
