@@ -1,0 +1,9 @@
+.direnv
+node_modules
+ignored
+.idea
+*.db
+.env
+.env.*
+dist
+*.log
