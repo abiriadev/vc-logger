@@ -8,6 +8,7 @@ import {
 	REST,
 	Routes,
 	SlashCommandBuilder,
+	EmbedBuilder,
 } from 'discord.js'
 import { Logger } from 'tslog'
 import * as db from './db.js'
@@ -163,9 +164,15 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 			// Log "User left"
 			if (channel instanceof VoiceChannel) {
 				try {
-					await channel.send(
-						`${oldState.member?.user.username} left VC.`,
-					)
+					await channel.send({
+						embeds: [
+							new EmbedBuilder()
+								.setColor('#e74c3c')
+								.setDescription(
+									`<@${oldState.member?.user.id}>님이 떠나셨어요.`,
+								),
+						],
+					})
 				} catch (e) {
 					// Ignore missing permissions or non-text channel errors
 				}
@@ -223,9 +230,15 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 			// I will log "User joined" as well.
 			try {
 				if (channel instanceof VoiceChannel) {
-					await channel.send(
-						`${newState.member?.user.username} joined VC.`,
-					)
+					await channel.send({
+						embeds: [
+							new EmbedBuilder()
+								.setColor('#2ecc71')
+								.setDescription(
+									`<@${newState.member?.user.id}>님이 입장하셨어요!`,
+								),
+						],
+					})
 				}
 			} catch (e) {
 				log.warn(
