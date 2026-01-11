@@ -1,10 +1,12 @@
-import { DatabaseSync } from 'node:sqlite'
+import Database from 'better-sqlite3'
 import { Logger } from 'tslog'
 
 const log = new Logger({ name: 'db' })
 
 // Initialize DB
-const db = new DatabaseSync('vc_logger.db')
+const db = new Database('vc_logger.db')
+
+db.pragma('journal_mode = WAL')
 
 export function initDb() {
 	log.info('Initializing database...')
