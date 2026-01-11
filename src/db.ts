@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
-import sql from 'sql-template-strings'
 import { Logger } from 'tslog'
+import sql, { SQLStatement } from 'sql-template-strings'
 
 export interface UserSession {
 	id: number
@@ -27,36 +27,76 @@ export interface LeaderboardEntry {
 export class Storage {
 	private db: Database.Database
 	private logger: Logger<unknown>
+	private stmtsCache: Map<string, Database.Statement>
 
 	constructor(dbPath: string, logger: Logger<unknown>) {
 		this.logger = logger
+
 		this.db = new Database(dbPath)
-		this.db.pragma('journal_mode = WAL')
+		this.stmtsCache = new Map()
+
+		this.db.pragma(sql`journal_mode = WAL`.sql)
+
 		this.initDb()
+	}
+
+	private stmt(sql: SQLStatement) {
+		let cachedStmt = this.stmtsCache.get(sql.sql)
+
+		if (!cachedStmt) {
+			const stmt = this.db.prepare(sql.sql)
+
+			this.stmtsCache.set(sql.sql, stmt)
+
+			cachedStmt = stmt
+		}
+
+		return {
+			run() {
+				return cachedStmt.run(...sql.values)
+			},
+			get() {
+				return cachedStmt.get(...sql.values)
+			},
+			all() {
+				return cachedStmt.all(...sql.values)
+			},
+			iterate() {
+				return cachedStmt.iterate(...sql.values)
+			},
+		}
 	}
 
 	private initDb() {
 		this.logger.info('Initializing database...')
-		this.db.exec(`
-    CREATE TABLE IF NOT EXISTS user_sessions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      guild_id TEXT NOT NULL,
-      channel_id TEXT NOT NULL,
-      start_time INTEGER NOT NULL,
-      end_time INTEGER
-    )
-  `)
 
-		this.db.exec(`
-    CREATE TABLE IF NOT EXISTS channel_sessions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      guild_id TEXT NOT NULL,
-      channel_id TEXT NOT NULL,
-      start_time INTEGER NOT NULL,
-      end_time INTEGER
-    )
-  `)
+		// table: user_session
+		this.db.exec(
+			sql`
+			create table if not exists "user_sessions" (
+				"id" integer primary key autoincrement,
+				"user_id" text not null,
+				"guild_id" text not null,
+				"channel_id" text not null,
+				"start_time" integer not null,
+				"end_time" integer
+			)
+			`.sql,
+		)
+
+		// table: channel_session
+		this.db.exec(
+			sql`
+			create table if not exists "channel_sessions" (
+				"id" integer primary key autoincrement,
+				"guild_id" text not null,
+				"channel_id" text not null,
+				"start_time" integer not null,
+				"end_time" integer
+			)
+			`.sql,
+		)
+
 		this.logger.info('Database initialized.')
 	}
 
@@ -66,66 +106,90 @@ export class Storage {
 		channelId: string,
 	): number {
 		const startTime = Date.now()
-		const query = sql`
-      INSERT INTO user_sessions (user_id, guild_id, channel_id, start_time)
-      VALUES (${userId}, ${guildId}, ${channelId}, ${startTime})
-    `
-		const stmt = this.db.prepare(query.sql)
-		stmt.run(...query.values)
+
+		this.stmt(
+			sql`
+			insert into "user_sessions" (user_id, guild_id, channel_id, start_time)
+			values (${userId}, ${guildId}, ${channelId}, ${startTime})
+			`,
+		).run()
+
 		return startTime
 	}
 
 	public endUserSession(userId: string, guildId: string, channelId: string) {
-		const query = sql`
-      SELECT id, start_time FROM user_sessions
-      WHERE user_id = ${userId} AND guild_id = ${guildId} AND channel_id = ${channelId} AND end_time IS NULL
-      ORDER BY start_time DESC
-      LIMIT 1
-    `
-		const stmt = this.db.prepare(query.sql)
-		const row = stmt.get(...query.values) as
-			| { id: number; start_time: number }
+		const row = this.stmt(
+			sql`
+			select "id", "start_time" from "user_sessions"
+			where
+				"user_id" = ${userId}
+				and "guild_id" = ${guildId}
+				and "channel_id" = ${channelId}
+				and "end_time" is null
+			order by "start_time" desc
+			limit 1
+		`,
+		).get() as
+			| {
+					id: number
+					start_time: number
+			  }
 			| undefined
 
 		if (row) {
 			const endTime = Date.now()
-			const updateQuery = sql`
-        UPDATE user_sessions
-        SET end_time = ${endTime}
-        WHERE id = ${row.id}
-      `
-			const updateStmt = this.db.prepare(updateQuery.sql)
-			updateStmt.run(...updateQuery.values)
-			return { startTime: row.start_time, endTime }
+
+			this.stmt(
+				sql`
+				update "user_sessions"
+				set "end_time" = ${endTime}
+				where "id" = ${row.id}
+			`,
+			).run()
+
+			return {
+				startTime: row.start_time,
+				endTime,
+			}
 		}
+
 		return null
 	}
 
-	public getChannelSession(
-		channelId: string,
-	): { id: number; start_time: number } | undefined {
-		const query = sql`
-      SELECT id, start_time FROM channel_sessions
-      WHERE channel_id = ${channelId} AND end_time IS NULL
-      ORDER BY start_time DESC
-      LIMIT 1
-    `
-		const stmt = this.db.prepare(query.sql)
-		return stmt.get(...query.values) as
-			| { id: number; start_time: number }
+	public getChannelSession(channelId: string):
+		| {
+				id: number
+				start_time: number
+		  }
+		| undefined {
+		return this.stmt(
+			sql`
+			select "id", "start_time" from "channel_sessions"
+			where "channel_id" = ${channelId} and "end_time" is null
+			order by "start_time" desc
+			limit 1
+			`,
+		).get() as
+			| {
+					id: number
+					start_time: number
+			  }
 			| undefined
 	}
 
 	public startChannelSession(guildId: string, channelId: string): boolean {
 		const existing = this.getChannelSession(channelId)
+
 		if (!existing) {
 			const startTime = Date.now()
-			const query = sql`
-        INSERT INTO channel_sessions (guild_id, channel_id, start_time)
-        VALUES (${guildId}, ${channelId}, ${startTime})
-      `
-			const stmt = this.db.prepare(query.sql)
-			stmt.run(...query.values)
+
+			this.stmt(
+				sql`
+				insert into "channel_sessions" ("guild_id", channel_id, start_time)
+				values (${guildId}, ${channelId}, ${startTime})
+				`,
+			).run()
+
 			return true
 		}
 		return false
@@ -135,14 +199,19 @@ export class Storage {
 		const existing = this.getChannelSession(channelId)
 		if (existing) {
 			const endTime = Date.now()
-			const query = sql`
-        UPDATE channel_sessions
-        SET end_time = ${endTime}
-        WHERE id = ${existing.id}
-      `
-			const stmt = this.db.prepare(query.sql)
-			stmt.run(...query.values)
-			return { startTime: existing.start_time, endTime }
+
+			this.stmt(
+				sql`
+				update "channel_sessions"
+				set "end_time" = ${endTime}
+				where "id" = ${existing.id}
+				`,
+			).run()
+
+			return {
+				startTime: existing.start_time,
+				endTime,
+			}
 		}
 		return null
 	}
@@ -150,29 +219,36 @@ export class Storage {
 	public getUserStats(
 		userId: string,
 		guildId: string,
-	): { start_time: number; end_time: number }[] {
-		const query = sql`
-      SELECT start_time, end_time FROM user_sessions
-      WHERE user_id = ${userId} AND guild_id = ${guildId} AND end_time IS NOT NULL
-    `
-		const stmt = this.db.prepare(query.sql)
-		return stmt.all(...query.values) as {
+	): {
+		start_time: number
+		end_time: number
+	}[] {
+		return this.stmt(
+			sql`
+			select "start_time", "end_time" from "user_sessions"
+			where
+				"user_id" = ${userId}
+				and "guild_id" = ${guildId}
+				and "end_time" is not null
+			`,
+		).all() as {
 			start_time: number
 			end_time: number
 		}[]
 	}
 
 	public getGuildLeaderboard(guildId: string): LeaderboardEntry[] {
-		const query = sql`
-      SELECT user_id, SUM(end_time - start_time) as total_duration
-      FROM user_sessions
-      WHERE guild_id = ${guildId} AND end_time IS NOT NULL
-      GROUP BY user_id
-      ORDER BY total_duration DESC
-      LIMIT 10
-    `
-		const stmt = this.db.prepare(query.sql)
-		return stmt.all(...query.values) as LeaderboardEntry[]
+		return this.stmt(
+			sql`
+			select "user_id", sum("end_time" - "start_time") as total_duration
+			from "user_sessions"
+			where
+				"guild_id" = ${guildId}
+				and "end_time" is not null
+			group by "user_id"
+			offset 0 rows fetch next 10 rows only
+			`,
+		).all() as LeaderboardEntry[]
 	}
 
 	public close() {
