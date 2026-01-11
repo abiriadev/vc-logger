@@ -6,7 +6,7 @@
 	"scripts": {
 		"build": "swc src -d dist --strip-leading-paths",
 		"build:type": "tsc",
-		"start": "node --enable-source-maps dist/index.js",
+		"start": "node --enable-source-maps --env-file .env dist/index.js",
 		"start:dev": "tsx --env-file .env ./src/index.ts",
 		"format": "prettier --write ."
 	},
@@ -22,6 +22,7 @@
 	"dependencies": {
 		"better-sqlite3": "^12.6.0",
 		"discord.js": "^14.25.1",
+		"sql-template-strings": "^2.2.2",
 		"tslog": "^4.10.2"
 	}
 }

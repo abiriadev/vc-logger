@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import sql from 'sql-template-strings'
 import { Logger } from 'tslog'
 
 export interface UserSession {
@@ -64,34 +65,37 @@ export class Storage {
 		guildId: string,
 		channelId: string,
 	): number {
-		const stmt = this.db.prepare(`
-    INSERT INTO user_sessions (user_id, guild_id, channel_id, start_time)
-    VALUES (?, ?, ?, ?)
-  `)
 		const startTime = Date.now()
-		stmt.run(userId, guildId, channelId, startTime)
+		const query = sql`
+      INSERT INTO user_sessions (user_id, guild_id, channel_id, start_time)
+      VALUES (${userId}, ${guildId}, ${channelId}, ${startTime})
+    `
+		const stmt = this.db.prepare(query.text)
+		stmt.run(...query.values)
 		return startTime
 	}
 
 	public endUserSession(userId: string, guildId: string, channelId: string) {
-		const stmt = this.db.prepare(`
-    SELECT id, start_time FROM user_sessions
-    WHERE user_id = ? AND guild_id = ? AND channel_id = ? AND end_time IS NULL
-    ORDER BY start_time DESC
-    LIMIT 1
-  `)
-		const row = stmt.get(userId, guildId, channelId) as
+		const query = sql`
+      SELECT id, start_time FROM user_sessions
+      WHERE user_id = ${userId} AND guild_id = ${guildId} AND channel_id = ${channelId} AND end_time IS NULL
+      ORDER BY start_time DESC
+      LIMIT 1
+    `
+		const stmt = this.db.prepare(query.text)
+		const row = stmt.get(...query.values) as
 			| { id: number; start_time: number }
 			| undefined
 
 		if (row) {
 			const endTime = Date.now()
-			const updateStmt = this.db.prepare(`
-      UPDATE user_sessions
-      SET end_time = ?
-      WHERE id = ?
-    `)
-			updateStmt.run(endTime, row.id)
+			const updateQuery = sql`
+        UPDATE user_sessions
+        SET end_time = ${endTime}
+        WHERE id = ${row.id}
+      `
+			const updateStmt = this.db.prepare(updateQuery.text)
+			updateStmt.run(...updateQuery.values)
 			return { startTime: row.start_time, endTime }
 		}
 		return null
@@ -100,13 +104,14 @@ export class Storage {
 	public getChannelSession(
 		channelId: string,
 	): { id: number; start_time: number } | undefined {
-		const stmt = this.db.prepare(`
-    SELECT id, start_time FROM channel_sessions
-    WHERE channel_id = ? AND end_time IS NULL
-    ORDER BY start_time DESC
-    LIMIT 1
-  `)
-		return stmt.get(channelId) as
+		const query = sql`
+      SELECT id, start_time FROM channel_sessions
+      WHERE channel_id = ${channelId} AND end_time IS NULL
+      ORDER BY start_time DESC
+      LIMIT 1
+    `
+		const stmt = this.db.prepare(query.text)
+		return stmt.get(...query.values) as
 			| { id: number; start_time: number }
 			| undefined
 	}
@@ -114,11 +119,13 @@ export class Storage {
 	public startChannelSession(guildId: string, channelId: string): boolean {
 		const existing = this.getChannelSession(channelId)
 		if (!existing) {
-			const stmt = this.db.prepare(`
-      INSERT INTO channel_sessions (guild_id, channel_id, start_time)
-      VALUES (?, ?, ?)
-    `)
-			stmt.run(guildId, channelId, Date.now())
+			const startTime = Date.now()
+			const query = sql`
+        INSERT INTO channel_sessions (guild_id, channel_id, start_time)
+        VALUES (${guildId}, ${channelId}, ${startTime})
+      `
+			const stmt = this.db.prepare(query.text)
+			stmt.run(...query.values)
 			return true
 		}
 		return false
@@ -128,12 +135,13 @@ export class Storage {
 		const existing = this.getChannelSession(channelId)
 		if (existing) {
 			const endTime = Date.now()
-			const stmt = this.db.prepare(`
-      UPDATE channel_sessions
-      SET end_time = ?
-      WHERE id = ?
-    `)
-			stmt.run(endTime, existing.id)
+			const query = sql`
+        UPDATE channel_sessions
+        SET end_time = ${endTime}
+        WHERE id = ${existing.id}
+      `
+			const stmt = this.db.prepare(query.text)
+			stmt.run(...query.values)
 			return { startTime: existing.start_time, endTime }
 		}
 		return null
@@ -143,26 +151,28 @@ export class Storage {
 		userId: string,
 		guildId: string,
 	): { start_time: number; end_time: number }[] {
-		const stmt = this.db.prepare(`
-        SELECT start_time, end_time FROM user_sessions
-        WHERE user_id = ? AND guild_id = ? AND end_time IS NOT NULL
-    `)
-		return stmt.all(userId, guildId) as {
+		const query = sql`
+      SELECT start_time, end_time FROM user_sessions
+      WHERE user_id = ${userId} AND guild_id = ${guildId} AND end_time IS NOT NULL
+    `
+		const stmt = this.db.prepare(query.text)
+		return stmt.all(...query.values) as {
 			start_time: number
 			end_time: number
 		}[]
 	}
 
 	public getGuildLeaderboard(guildId: string): LeaderboardEntry[] {
-		const stmt = this.db.prepare(`
-        SELECT user_id, SUM(end_time - start_time) as total_duration
-        FROM user_sessions
-        WHERE guild_id = ? AND end_time IS NOT NULL
-        GROUP BY user_id
-        ORDER BY total_duration DESC
-        LIMIT 10
-    `)
-		return stmt.all(guildId) as LeaderboardEntry[]
+		const query = sql`
+      SELECT user_id, SUM(end_time - start_time) as total_duration
+      FROM user_sessions
+      WHERE guild_id = ${guildId} AND end_time IS NOT NULL
+      GROUP BY user_id
+      ORDER BY total_duration DESC
+      LIMIT 10
+    `
+		const stmt = this.db.prepare(query.text)
+		return stmt.all(...query.values) as LeaderboardEntry[]
 	}
 
 	public close() {

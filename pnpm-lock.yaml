@@ -14,6 +14,9 @@ importers:
       discord.js:
         specifier: ^14.25.1
         version: 14.25.1
+      sql-template-strings:
+        specifier: ^2.2.2
+        version: 2.2.2
       tslog:
         specifier: ^4.10.2
         version: 4.10.2
@@ -928,6 +931,10 @@ packages:
   source-map@0.7.6:
     resolution: {integrity: sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ==}
     engines: {node: '>= 12'}
+
+  sql-template-strings@2.2.2:
+    resolution: {integrity: sha512-UXhXR2869FQaD+GMly8jAMCRZ94nU5KcrFetZfWEMd+LVVG6y0ExgHAhatEcKZ/wk8YcKPdi+hiD2wm75lq3/Q==}
+    engines: {node: '>=4.0.0'}
 
   streamx@2.23.0:
     resolution: {integrity: sha512-kn+e44esVfn2Fa/O0CPFcex27fjIL6MkVae0Mm6q+E6f0hWv578YCERbv+4m02cjxvDsPKLnmxral/rR6lBMAg==}
@@ -1861,6 +1868,8 @@ snapshots:
       is-plain-obj: 1.1.0
 
   source-map@0.7.6: {}
+
+  sql-template-strings@2.2.2: {}
 
   streamx@2.23.0:
     dependencies:
