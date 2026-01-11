@@ -1,6 +1,6 @@
 import { GatewayIntentBits } from 'discord.js'
 import { Logger } from 'tslog'
-import * as db from './db.js'
+import { Storage } from './db.js'
 import { Bot, type BotConfig } from './bot.js'
 
 const log = new Logger({ name: 'main' })
@@ -15,7 +15,7 @@ if (!TOKEN || !CLIENT_ID) {
 }
 
 // Initialize DB
-db.initDb()
+const storage = new Storage('vc_logger.db', log)
 
 // Init Bot
 const botConfig: BotConfig = {
@@ -30,6 +30,7 @@ const bot = new Bot(
 	},
 	botConfig,
 	log,
+	storage,
 )
 
 bot.login()

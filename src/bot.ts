@@ -11,7 +11,7 @@ import {
 	VoiceState,
 } from 'discord.js'
 import { Logger } from 'tslog'
-import * as db from './db.js'
+import { Storage } from './db.js'
 
 export interface BotConfig {
 	token: string
@@ -22,15 +22,18 @@ export interface BotConfig {
 export class Bot extends Client {
 	private config: BotConfig
 	private logger: Logger<unknown>
+	private storage: Storage
 
 	constructor(
 		options: ClientOptions,
 		config: BotConfig,
 		logger: Logger<unknown>,
+		storage: Storage,
 	) {
 		super(options)
 		this.config = config
 		this.logger = logger
+		this.storage = storage
 		this.registerEvents()
 	}
 
@@ -102,7 +105,10 @@ export class Bot extends Client {
 		if (interaction.commandName === 'stats') {
 			const targetUser =
 				interaction.options.getUser('target') || interaction.user
-			const stats = db.getUserStats(targetUser.id, interaction.guildId!)
+			const stats = this.storage.getUserStats(
+				targetUser.id,
+				interaction.guildId!,
+			)
 
 			let totalMs = 0
 			const history: Record<string, number> = {} // Date -> Duration ms
@@ -116,9 +122,12 @@ export class Bot extends Client {
 				if (date >= thirtyDaysAgo) {
 					const dateStr = date.toISOString().split('T')[0]
 					if (dateStr) {
-						const duration = s.end_time - s.start_time
-						totalMs += duration
-						history[dateStr] = (history[dateStr] || 0) + duration
+						if (s.end_time) {
+							const duration = s.end_time - s.start_time
+							totalMs += duration
+							history[dateStr] =
+								(history[dateStr] || 0) + duration
+						}
 					}
 				}
 			})
@@ -153,7 +162,7 @@ export class Bot extends Client {
 		}
 
 		if (interaction.commandName === 'leaderboard') {
-			const lb = db.getGuildLeaderboard(interaction.guildId!)
+			const lb = this.storage.getGuildLeaderboard(interaction.guildId!)
 			const lines = lb.map((entry, index) => {
 				const hours = (entry.total_duration / (1000 * 60 * 60)).toFixed(
 					1,
@@ -183,7 +192,11 @@ export class Bot extends Client {
 
 		// Handle Leave logic (oldChannelId is set)
 		if (oldChannelId) {
-			const result = db.endUserSession(userId, guildId, oldChannelId)
+			const result = this.storage.endUserSession(
+				userId,
+				guildId,
+				oldChannelId,
+			)
 
 			// Check if channel is now empty
 			const channel = oldState.channel // Should be available in cache usually
@@ -206,8 +219,9 @@ export class Bot extends Client {
 				}
 
 				if (channel.members.size === 0) {
-					const channelSession = db.endChannelSession(oldChannelId)
-					if (channelSession) {
+					const channelSession =
+						this.storage.endChannelSession(oldChannelId)
+					if (channelSession && channelSession.endTime) {
 						const durationMs =
 							channelSession.endTime - channelSession.startTime
 
@@ -242,12 +256,15 @@ export class Bot extends Client {
 
 		// Handle Join logic (newChannelId is set)
 		if (newChannelId) {
-			db.startUserSession(userId, guildId, newChannelId)
+			this.storage.startUserSession(userId, guildId, newChannelId)
 
 			// Check if channel session needs starting
 			const channel = newState.channel
 			if (channel) {
-				const started = db.startChannelSession(guildId, newChannelId)
+				const started = this.storage.startChannelSession(
+					guildId,
+					newChannelId,
+				)
 
 				// If we started a new session, or maybe just on every user join?
 				// "logs message on VC join/leave" - User requirement 1.
