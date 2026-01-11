@@ -13,12 +13,14 @@
 	"devDependencies": {
 		"@swc/cli": "^0.7.9",
 		"@swc/core": "^1.15.8",
+		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "^25.0.5",
 		"prettier": "^3.7.4",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3"
 	},
 	"dependencies": {
+		"better-sqlite3": "^12.6.0",
 		"discord.js": "^14.25.1",
 		"tslog": "^4.10.2"
 	}

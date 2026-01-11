@@ -31,4 +31,4 @@ A Discord bot that logs Voice Channel activity to SQLite and provides user stati
 
 ## Database
 
-The bot uses a local SQLite database `vc_logger.db`. It is automatically created on first run.
+The bot uses a local SQLite database `vc_logger.db`. It is automatically created on first run and accessed via `better-sqlite3`.
