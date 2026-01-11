@@ -70,7 +70,7 @@ export class Storage {
       INSERT INTO user_sessions (user_id, guild_id, channel_id, start_time)
       VALUES (${userId}, ${guildId}, ${channelId}, ${startTime})
     `
-		const stmt = this.db.prepare(query.text)
+		const stmt = this.db.prepare(query.sql)
 		stmt.run(...query.values)
 		return startTime
 	}
@@ -82,7 +82,7 @@ export class Storage {
       ORDER BY start_time DESC
       LIMIT 1
     `
-		const stmt = this.db.prepare(query.text)
+		const stmt = this.db.prepare(query.sql)
 		const row = stmt.get(...query.values) as
 			| { id: number; start_time: number }
 			| undefined
@@ -94,7 +94,7 @@ export class Storage {
         SET end_time = ${endTime}
         WHERE id = ${row.id}
       `
-			const updateStmt = this.db.prepare(updateQuery.text)
+			const updateStmt = this.db.prepare(updateQuery.sql)
 			updateStmt.run(...updateQuery.values)
 			return { startTime: row.start_time, endTime }
 		}
@@ -110,7 +110,7 @@ export class Storage {
       ORDER BY start_time DESC
       LIMIT 1
     `
-		const stmt = this.db.prepare(query.text)
+		const stmt = this.db.prepare(query.sql)
 		return stmt.get(...query.values) as
 			| { id: number; start_time: number }
 			| undefined
@@ -124,7 +124,7 @@ export class Storage {
         INSERT INTO channel_sessions (guild_id, channel_id, start_time)
         VALUES (${guildId}, ${channelId}, ${startTime})
       `
-			const stmt = this.db.prepare(query.text)
+			const stmt = this.db.prepare(query.sql)
 			stmt.run(...query.values)
 			return true
 		}
@@ -140,7 +140,7 @@ export class Storage {
         SET end_time = ${endTime}
         WHERE id = ${existing.id}
       `
-			const stmt = this.db.prepare(query.text)
+			const stmt = this.db.prepare(query.sql)
 			stmt.run(...query.values)
 			return { startTime: existing.start_time, endTime }
 		}
@@ -155,7 +155,7 @@ export class Storage {
       SELECT start_time, end_time FROM user_sessions
       WHERE user_id = ${userId} AND guild_id = ${guildId} AND end_time IS NOT NULL
     `
-		const stmt = this.db.prepare(query.text)
+		const stmt = this.db.prepare(query.sql)
 		return stmt.all(...query.values) as {
 			start_time: number
 			end_time: number
@@ -171,7 +171,7 @@ export class Storage {
       ORDER BY total_duration DESC
       LIMIT 10
     `
-		const stmt = this.db.prepare(query.text)
+		const stmt = this.db.prepare(query.sql)
 		return stmt.all(...query.values) as LeaderboardEntry[]
 	}
 
