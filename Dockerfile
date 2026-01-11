@@ -2,7 +2,7 @@ FROM node:24.12.0-bookworm-slim AS builder
 
 WORKDIR /app
 
-COPY ./.swcrc ./
+COPY ./pnpm-workspace.yaml ./.swcrc ./
 COPY ./package.json ./pnpm-lock.yaml ./
 
 RUN ["corepack", "enable"]
