@@ -13,7 +13,7 @@ export interface UserSession {
 	endTime: Date
 }
 
-export interface UserSessionRaw {
+interface UserSessionRaw {
 	id: number
 	guild_id: string
 	channel_id: string
@@ -52,7 +52,7 @@ export interface ChannelSession {
 	endTime: Date
 }
 
-export interface ChannelSessionRaw {
+interface ChannelSessionRaw {
 	id: number
 	guild_id: string
 	channel_id: string
