@@ -24,6 +24,7 @@ A Discord bot that logs Voice Channel activity to SQLite and provides user stati
     - `DISCORD_TOKEN`: Your Discord Bot Token.
     - `CLIENT_ID`: The Application ID of the bot.
     - `GUILD_ID`: (Optional) The Server (Guild) ID for instant command registration during development. If omitted, commands are registered globally (takes up to 1h to propagate).
+    - `DB_PATH`: (Optional) Path to the SQLite database file. Defaults to `vc_logger.db`.
 
 3. **Run**:
     - Dev: `pnpm start:dev`

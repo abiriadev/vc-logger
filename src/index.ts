@@ -14,8 +14,10 @@ if (!TOKEN || !CLIENT_ID) {
 	process.exit(1)
 }
 
+const DB_PATH = process.env.DB_PATH || 'vc_logger.db'
+
 // Initialize DB
-const storage = new Storage('vc_logger.db', log)
+const storage = new Storage(DB_PATH, log)
 
 // Init Bot
 const botConfig: BotConfig = {
