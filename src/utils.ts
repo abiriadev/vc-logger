@@ -1,5 +1,7 @@
 import type { Client, Snowflake } from 'discord.js'
 
+export const dateToUnix = (date: Date) => Math.floor(date.getTime() / 1000)
+
 export async function fetchFullVoiceChannelMemberState(
 	client: Client,
 ): Promise<Record<Snowflake, Record<Snowflake, Snowflake[]>>> {

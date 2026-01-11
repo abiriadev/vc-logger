@@ -1,22 +1,83 @@
 import Database from 'better-sqlite3'
 import { Logger } from 'tslog'
 import sql, { SQLStatement } from 'sql-template-strings'
+import type { Snowflake } from 'discord.js'
+import { dateToUnix } from './utils'
 
 export interface UserSession {
 	id: number
-	user_id: string
+	guildId: Snowflake
+	channelId: Snowflake
+	userId: Snowflake
+	startTime: Date
+	endTime: Date
+}
+
+export interface UserSessionRaw {
+	id: number
 	guild_id: string
 	channel_id: string
+	user_id: string
 	start_time: number
-	end_time?: number
+	end_time: number
+}
+
+function toUserSession(raw: UserSessionRaw): UserSession {
+	return {
+		id: raw.id,
+		guildId: raw.guild_id,
+		channelId: raw.channel_id,
+		userId: raw.user_id,
+		startTime: new Date(raw.start_time),
+		endTime: new Date(raw.end_time),
+	}
+}
+
+function fromUserSession(raw: UserSession): UserSessionRaw {
+	return {
+		id: raw.id,
+		guild_id: raw.guildId,
+		channel_id: raw.channelId,
+		user_id: raw.userId,
+		start_time: dateToUnix(raw.startTime),
+		end_time: dateToUnix(raw.endTime),
+	}
 }
 
 export interface ChannelSession {
 	id: number
+	guildId: Snowflake
+	channelId: Snowflake
+	startTime: Date
+	endTime: Date
+}
+
+export interface ChannelSessionRaw {
+	id: number
 	guild_id: string
 	channel_id: string
 	start_time: number
-	end_time?: number
+	end_time: number
+}
+
+function toChannelSession(raw: ChannelSessionRaw): ChannelSession {
+	return {
+		id: raw.id,
+		guildId: raw.guild_id,
+		channelId: raw.channel_id,
+		startTime: new Date(raw.start_time),
+		endTime: new Date(raw.end_time),
+	}
+}
+
+function fromChannelSession(raw: ChannelSession): ChannelSessionRaw {
+	return {
+		id: raw.id,
+		guild_id: raw.guildId,
+		channel_id: raw.channelId,
+		start_time: dateToUnix(raw.startTime),
+		end_time: dateToUnix(raw.endTime),
+	}
 }
 
 export interface LeaderboardEntry {
@@ -75,11 +136,11 @@ export class Storage {
 			sql`
 			create table if not exists "user_sessions" (
 				"id" integer primary key autoincrement,
-				"user_id" text not null,
 				"guild_id" text not null,
 				"channel_id" text not null,
+				"user_id" text not null,
 				"start_time" integer not null,
-				"end_time" integer
+				"end_time" integer not null
 			)
 			`.sql,
 		)
@@ -92,7 +153,7 @@ export class Storage {
 				"guild_id" text not null,
 				"channel_id" text not null,
 				"start_time" integer not null,
-				"end_time" integer
+				"end_time" integer not null
 			)
 			`.sql,
 		)
@@ -156,25 +217,21 @@ export class Storage {
 		return null
 	}
 
-	public getChannelSession(channelId: string):
-		| {
-				id: number
-				start_time: number
-		  }
-		| undefined {
-		return this.stmt(
+	public getChannelSession(channelId: string) {
+		const raw = this.stmt(
 			sql`
 			select "id", "start_time" from "channel_sessions"
 			where "channel_id" = ${channelId} and "end_time" is null
 			order by "start_time" desc
 			limit 1
 			`,
-		).get() as
-			| {
-					id: number
-					start_time: number
-			  }
-			| undefined
+		).get() as ChannelSessionRaw | undefined
+
+		if (!raw) {
+			throw new Error('Channel session not found')
+		}
+
+		return toChannelSession(raw)
 	}
 
 	public startChannelSession(guildId: string, channelId: string): boolean {
@@ -197,22 +254,24 @@ export class Storage {
 
 	public endChannelSession(channelId: string) {
 		const existing = this.getChannelSession(channelId)
+
 		if (existing) {
-			const endTime = Date.now()
+			const endTime = new Date()
 
 			this.stmt(
 				sql`
 				update "channel_sessions"
-				set "end_time" = ${endTime}
+				set "end_time" = ${dateToUnix(endTime)}
 				where "id" = ${existing.id}
 				`,
 			).run()
 
 			return {
-				startTime: existing.start_time,
+				startTime: existing.startTime,
 				endTime,
 			}
 		}
+
 		return null
 	}
 

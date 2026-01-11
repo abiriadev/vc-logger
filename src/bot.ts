@@ -223,7 +223,8 @@ export class Bot extends Client {
 						this.storage.endChannelSession(oldChannelId)
 					if (channelSession && channelSession.endTime) {
 						const durationMs =
-							channelSession.endTime - channelSession.startTime
+							channelSession.endTime.getTime() -
+							channelSession.startTime.getTime()
 
 						// Format duration
 						const seconds = Math.floor((durationMs / 1000) % 60)
