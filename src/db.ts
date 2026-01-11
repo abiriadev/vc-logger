@@ -170,8 +170,8 @@ export class Storage {
 
 		this.stmt(
 			sql`
-			insert into "user_sessions" (user_id, guild_id, channel_id, start_time)
-			values (${userId}, ${guildId}, ${channelId}, ${startTime})
+			insert into "user_sessions" (guild_id, channel_id, user_id, start_time)
+			values (${guildId}, ${channelId}, ${userId}, ${startTime})
 			`,
 		).run()
 
@@ -183,9 +183,9 @@ export class Storage {
 			sql`
 			select "id", "start_time" from "user_sessions"
 			where
-				"user_id" = ${userId}
-				and "guild_id" = ${guildId}
+				"guild_id" = ${guildId}
 				and "channel_id" = ${channelId}
+				and "user_id" = ${userId}
 				and "end_time" is null
 			order by "start_time" desc
 			limit 1
@@ -221,7 +221,9 @@ export class Storage {
 		const raw = this.stmt(
 			sql`
 			select "id", "start_time" from "channel_sessions"
-			where "channel_id" = ${channelId} and "end_time" is null
+			where
+				"channel_id" = ${channelId}
+				and "end_time" is null
 			order by "start_time" desc
 			limit 1
 			`,
@@ -286,8 +288,8 @@ export class Storage {
 			sql`
 			select "start_time", "end_time" from "user_sessions"
 			where
-				"user_id" = ${userId}
-				and "guild_id" = ${guildId}
+				"guild_id" = ${guildId}
+				and "user_id" = ${userId}
 				and "end_time" is not null
 			`,
 		).all() as {
