@@ -11,7 +11,7 @@ import {
 	VoiceState,
 } from 'discord.js'
 import { Logger } from 'tslog'
-import { Storage } from './db.js'
+import { Storage } from './db'
 
 export interface BotConfig {
 	token: string

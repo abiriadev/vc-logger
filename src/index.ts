@@ -1,7 +1,7 @@
 import { GatewayIntentBits } from 'discord.js'
 import { Logger } from 'tslog'
-import { Storage } from './db.js'
-import { Bot, type BotConfig } from './bot.js'
+import { Storage } from './db'
+import { Bot, type BotConfig } from './bot'
 
 const log = new Logger({ name: 'main' })
 
