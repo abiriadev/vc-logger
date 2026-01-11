@@ -204,9 +204,15 @@ export class Bot extends Client {
 				// Log "User left"
 				if (channel instanceof VoiceChannel) {
 					try {
-						await channel.send(
-							`🔻<@${oldState.member?.user.id}>님이 떠나셨어요.`,
-						)
+						await channel.send({
+							embeds: [
+								new EmbedBuilder()
+									.setDescription(
+										`<@${oldState.member?.user.id}>(${oldState.member?.displayName})님이 떠나셨어요.`,
+									)
+									.setColor(`#e74c3c`),
+							],
+						})
 					} catch (e) {
 						// Ignore missing permissions or non-text channel errors
 					}
@@ -270,9 +276,15 @@ export class Bot extends Client {
 				// I will log "User joined" as well.
 				try {
 					if (channel instanceof VoiceChannel) {
-						await channel.send(
-							`🔺<@${newState.member.user.id}>님이 입장하셨어요!`,
-						)
+						await channel.send({
+							embeds: [
+								new EmbedBuilder()
+									.setDescription(
+										`<@${newState.member.user.id}>(${newState.member.displayName})님이 입장하셨어요!`,
+									)
+									.setColor(`#2ecc71`),
+							],
+						})
 					}
 				} catch (e) {
 					this.logger.warn(
