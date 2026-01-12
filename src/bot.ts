@@ -190,13 +190,16 @@ export class Bot extends Client {
 
 		if (oldChannelId === newChannelId) return // No change (e.g. mute toggle)
 
+		const now = new Date()
+
 		// Handle Leave logic (oldChannelId is set)
 		if (oldChannelId) {
-			const result = this.storage.endUserSession(
-				userId,
+			this.storage.endUserLiveSession({
 				guildId,
-				oldChannelId,
-			)
+				channelId: oldChannelId,
+				userId,
+				now,
+			})
 
 			// Check if channel is now empty
 			const channel = oldState.channel // Should be available in cache usually
@@ -257,7 +260,12 @@ export class Bot extends Client {
 
 		// Handle Join logic (newChannelId is set)
 		if (newChannelId) {
-			this.storage.startUserSession(userId, guildId, newChannelId)
+			this.storage.startUserLiveSession({
+				guildId,
+				channelId: newChannelId,
+				userId,
+				startTime: now,
+			})
 
 			// Check if channel session needs starting
 			const channel = newState.channel
