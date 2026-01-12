@@ -258,10 +258,45 @@ export class Storage {
 
 		const liveSession = toUserLiveSession(liveSessionRaw)
 
+		// second, insert the session into the user_sessions table.
 		const sessionRaw = this.stmt(
 			sql`
 			insert into "user_sessions" (guild_id, channel_id, user_id, start_time, end_time)
 			values (${v.guildId}, ${v.channelId}, ${v.userId}, ${liveSession.startTime}, ${dateToUnix(v.now)})
+			returning *
+			`,
+		).get() as UserSessionRaw | undefined
+
+		if (!sessionRaw)
+			throw new Error('Failed to retrieve newly created user session')
+
+		return toUserSession(sessionRaw)
+	}
+
+	public archiveCurrentUserLiveSession(
+		v: Pick<UserLiveSession, 'guildId' | 'channelId' | 'userId'>,
+	): UserSession {
+		// first, find the row. if it doesn't exist, throw.
+		const liveSessionRaw = this.stmt(
+			sql`
+			delete from "user_live_sessions"
+			where
+				"guild_id" = ${v.guildId}
+				and "channel_id" = ${v.channelId}
+				and "user_id" = ${v.userId}
+			returning *
+			`,
+		).get() as UserLiveSessionRaw | undefined
+
+		if (!liveSessionRaw) throw new Error('Live session not found')
+
+		const liveSession = toUserLiveSession(liveSessionRaw)
+
+		// second, insert the session into the user_sessions table.
+		const sessionRaw = this.stmt(
+			sql`
+			insert into "user_sessions" (guild_id, channel_id, user_id, start_time, end_time)
+			values (${v.guildId}, ${v.channelId}, ${v.userId}, ${liveSession.startTime}, ${liveSession.lastTime})
 			returning *
 			`,
 		).get() as UserSessionRaw | undefined
