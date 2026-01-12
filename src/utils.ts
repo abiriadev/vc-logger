@@ -1,5 +1,19 @@
 import type { Client, Snowflake } from 'discord.js'
 
+export type CamelCase<S extends string> =
+	S extends `${infer P1}_${infer P2}${infer P3}`
+		? `${Lowercase<P1>}${Uppercase<P2>}${CamelCase<P3>}`
+		: Lowercase<S>
+
+export type SnakeCase<S extends string> = S extends `${infer T}${infer U}`
+	? `${T extends Uncapitalize<T> ? '' : '_'}${Lowercase<T>}${SnakeCase<U>}`
+	: S
+
+export type PartialMap<T, U> = {
+	[K in keyof T as SnakeCase<string & K> & keyof U]: U[SnakeCase<string & K> &
+		keyof U]
+}
+
 export const dateToUnix = (date: Date) => Math.floor(date.getTime() / 1000)
 
 export async function fetchFullVoiceChannelMemberState(

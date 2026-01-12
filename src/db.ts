@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import { Logger } from 'tslog'
 import sql, { SQLStatement } from 'sql-template-strings'
 import type { Snowflake } from 'discord.js'
-import { dateToUnix } from './utils'
+import { dateToUnix, type PartialMap } from './utils'
 
 export interface UserSession {
 	id: number
@@ -33,15 +33,20 @@ function toUserSession(raw: UserSessionRaw): UserSession {
 	}
 }
 
-function fromUserSession(value: UserSession): UserSessionRaw {
-	return {
-		id: value.id,
-		guild_id: value.guildId,
-		channel_id: value.channelId,
-		user_id: value.userId,
-		start_time: dateToUnix(value.startTime),
-		end_time: dateToUnix(value.endTime),
-	}
+function fromUserSession<T extends Partial<UserSession> = UserSession>(
+	value: T,
+): PartialMap<T, UserSessionRaw> {
+	const raw: any = {}
+
+	if (value.id !== undefined) raw.id = value.id
+	if (value.guildId !== undefined) raw.guild_id = value.guildId
+	if (value.channelId !== undefined) raw.channel_id = value.channelId
+	if (value.userId !== undefined) raw.user_id = value.userId
+	if (value.startTime !== undefined)
+		raw.start_time = dateToUnix(value.startTime)
+	if (value.endTime !== undefined) raw.end_time = dateToUnix(value.endTime)
+
+	return raw
 }
 
 export interface UserLiveSession {
@@ -73,15 +78,20 @@ function toUserLiveSession(raw: UserLiveSessionRaw): UserLiveSession {
 	}
 }
 
-function fromUserLiveSession(value: UserLiveSession): UserLiveSessionRaw {
-	return {
-		id: value.id,
-		guild_id: value.guildId,
-		channel_id: value.channelId,
-		user_id: value.userId,
-		start_time: dateToUnix(value.startTime),
-		last_time: dateToUnix(value.lastTime),
-	}
+function fromUserLiveSession<
+	T extends Partial<UserLiveSession> = UserLiveSession,
+>(value: T): PartialMap<T, UserLiveSessionRaw> {
+	const raw: any = {}
+
+	if (value.id !== undefined) raw.id = value.id
+	if (value.guildId !== undefined) raw.guild_id = value.guildId
+	if (value.channelId !== undefined) raw.channel_id = value.channelId
+	if (value.userId !== undefined) raw.user_id = value.userId
+	if (value.startTime !== undefined)
+		raw.start_time = dateToUnix(value.startTime)
+	if (value.lastTime !== undefined) raw.last_time = dateToUnix(value.lastTime)
+
+	return raw
 }
 
 export interface ChannelSession {
@@ -110,14 +120,19 @@ function toChannelSession(raw: ChannelSessionRaw): ChannelSession {
 	}
 }
 
-function fromChannelSession(value: ChannelSession): ChannelSessionRaw {
-	return {
-		id: value.id,
-		guild_id: value.guildId,
-		channel_id: value.channelId,
-		start_time: dateToUnix(value.startTime),
-		end_time: dateToUnix(value.endTime),
-	}
+function fromChannelSession<T extends Partial<ChannelSession>>(
+	value: T,
+): PartialMap<T, UserSessionRaw> {
+	const raw: any = {}
+
+	if (value.id !== undefined) raw.id = value.id
+	if (value.guildId !== undefined) raw.guild_id = value.guildId
+	if (value.channelId !== undefined) raw.channel_id = value.channelId
+	if (value.startTime !== undefined)
+		raw.start_time = dateToUnix(value.startTime)
+	if (value.endTime !== undefined) raw.end_time = dateToUnix(value.endTime)
+
+	return raw
 }
 
 export interface LeaderboardEntry {
@@ -216,15 +231,17 @@ export class Storage {
 	}
 
 	public startUserLiveSession(
-		v: Pick<
+		input: Pick<
 			UserLiveSession,
 			'guildId' | 'channelId' | 'userId' | 'startTime'
 		>,
 	): UserLiveSession {
+		const inputRaw = fromUserLiveSession(input)
+
 		const liveSessionRaw = this.stmt(
 			sql`
 			insert into "user_live_sessions" (guild_id, channel_id, user_id, start_time)
-			values (${v.guildId}, ${v.channelId}, ${v.userId}, ${v.startTime})
+			values (${inputRaw.guild_id}, ${inputRaw.channel_id}, ${inputRaw.user_id}, ${inputRaw.start_time})
 			returning *
 			`,
 		).get() as UserLiveSessionRaw | undefined
@@ -238,31 +255,32 @@ export class Storage {
 	}
 
 	public endUserLiveSession(
-		v: Pick<UserLiveSession, 'guildId' | 'channelId' | 'userId'> & {
-			now: Date
-		},
+		input: Pick<
+			UserLiveSession,
+			'guildId' | 'channelId' | 'userId' | 'lastTime'
+		>,
 	): UserSession {
+		const inputRaw = fromUserLiveSession(input)
+
 		// first, find the row. if it doesn't exist, throw.
 		const liveSessionRaw = this.stmt(
 			sql`
 			delete from "user_live_sessions"
 			where
-				"guild_id" = ${v.guildId}
-				and "channel_id" = ${v.channelId}
-				and "user_id" = ${v.userId}
+				"guild_id" = ${inputRaw.guild_id}
+				and "channel_id" = ${inputRaw.channel_id}
+				and "user_id" = ${inputRaw.user_id}
 			returning *
 			`,
 		).get() as UserLiveSessionRaw | undefined
 
 		if (!liveSessionRaw) throw new Error('Live session not found')
 
-		const liveSession = toUserLiveSession(liveSessionRaw)
-
 		// second, insert the session into the user_sessions table.
 		const sessionRaw = this.stmt(
 			sql`
 			insert into "user_sessions" (guild_id, channel_id, user_id, start_time, end_time)
-			values (${v.guildId}, ${v.channelId}, ${v.userId}, ${liveSession.startTime}, ${dateToUnix(v.now)})
+			values (${liveSessionRaw.guild_id}, ${liveSessionRaw.channel_id}, ${liveSessionRaw.user_id}, ${liveSessionRaw.start_time}, ${inputRaw.last_time})
 			returning *
 			`,
 		).get() as UserSessionRaw | undefined
@@ -274,29 +292,27 @@ export class Storage {
 	}
 
 	public archiveCurrentUserLiveSession(
-		v: Pick<UserLiveSession, 'guildId' | 'channelId' | 'userId'>,
+		input: Pick<UserLiveSession, 'guildId' | 'channelId' | 'userId'>,
 	): UserSession {
 		// first, find the row. if it doesn't exist, throw.
 		const liveSessionRaw = this.stmt(
 			sql`
 			delete from "user_live_sessions"
 			where
-				"guild_id" = ${v.guildId}
-				and "channel_id" = ${v.channelId}
-				and "user_id" = ${v.userId}
+				"guild_id" = ${input.guildId}
+				and "channel_id" = ${input.channelId}
+				and "user_id" = ${input.userId}
 			returning *
 			`,
 		).get() as UserLiveSessionRaw | undefined
 
 		if (!liveSessionRaw) throw new Error('Live session not found')
 
-		const liveSession = toUserLiveSession(liveSessionRaw)
-
 		// second, insert the session into the user_sessions table.
 		const sessionRaw = this.stmt(
 			sql`
 			insert into "user_sessions" (guild_id, channel_id, user_id, start_time, end_time)
-			values (${v.guildId}, ${v.channelId}, ${v.userId}, ${liveSession.startTime}, ${liveSession.lastTime})
+			values (${liveSessionRaw.guild_id}, ${liveSessionRaw.channel_id}, ${liveSessionRaw.user_id}, ${liveSessionRaw.start_time}, ${liveSessionRaw.last_time})
 			returning *
 			`,
 		).get() as UserSessionRaw | undefined
