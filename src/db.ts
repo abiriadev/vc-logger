@@ -33,14 +33,54 @@ function toUserSession(raw: UserSessionRaw): UserSession {
 	}
 }
 
-function fromUserSession(raw: UserSession): UserSessionRaw {
+function fromUserSession(value: UserSession): UserSessionRaw {
+	return {
+		id: value.id,
+		guild_id: value.guildId,
+		channel_id: value.channelId,
+		user_id: value.userId,
+		start_time: dateToUnix(value.startTime),
+		end_time: dateToUnix(value.endTime),
+	}
+}
+
+export interface UserLiveSession {
+	id: number
+	guildId: Snowflake
+	channelId: Snowflake
+	userId: Snowflake
+	startTime: Date
+	lastTime: Date
+}
+
+interface UserLiveSessionRaw {
+	id: number
+	guild_id: string
+	channel_id: string
+	user_id: string
+	start_time: number
+	last_time: number
+}
+
+function toUserLiveSession(raw: UserLiveSessionRaw): UserLiveSession {
 	return {
 		id: raw.id,
-		guild_id: raw.guildId,
-		channel_id: raw.channelId,
-		user_id: raw.userId,
-		start_time: dateToUnix(raw.startTime),
-		end_time: dateToUnix(raw.endTime),
+		guildId: raw.guild_id,
+		channelId: raw.channel_id,
+		userId: raw.user_id,
+		startTime: new Date(raw.start_time),
+		lastTime: new Date(raw.last_time),
+	}
+}
+
+function fromUserLiveSession(value: UserLiveSession): UserLiveSessionRaw {
+	return {
+		id: value.id,
+		guild_id: value.guildId,
+		channel_id: value.channelId,
+		user_id: value.userId,
+		start_time: dateToUnix(value.startTime),
+		last_time: dateToUnix(value.lastTime),
 	}
 }
 
@@ -70,13 +110,13 @@ function toChannelSession(raw: ChannelSessionRaw): ChannelSession {
 	}
 }
 
-function fromChannelSession(raw: ChannelSession): ChannelSessionRaw {
+function fromChannelSession(value: ChannelSession): ChannelSessionRaw {
 	return {
-		id: raw.id,
-		guild_id: raw.guildId,
-		channel_id: raw.channelId,
-		start_time: dateToUnix(raw.startTime),
-		end_time: dateToUnix(raw.endTime),
+		id: value.id,
+		guild_id: value.guildId,
+		channel_id: value.channelId,
+		start_time: dateToUnix(value.startTime),
+		end_time: dateToUnix(value.endTime),
 	}
 }
 
@@ -145,6 +185,20 @@ export class Storage {
 			`.sql,
 		)
 
+		// table: user_live_session
+		this.db.exec(
+			sql`
+			create table if not exists "user_live_sessions" (
+				"id" integer primary key autoincrement,
+				"guild_id" text not null,
+				"channel_id" text not null,
+				"user_id" text not null,
+				"start_time" integer not null,
+				"last_time" integer not null
+			)
+			`.sql,
+		)
+
 		// table: channel_session
 		this.db.exec(
 			sql`
@@ -159,6 +213,63 @@ export class Storage {
 		)
 
 		this.logger.info('Database initialized.')
+	}
+
+	public startUserLiveSession(
+		v: Pick<
+			UserLiveSession,
+			'guildId' | 'channelId' | 'userId' | 'startTime'
+		>,
+	): UserLiveSession {
+		const liveSessionRaw = this.stmt(
+			sql`
+			insert into "user_live_sessions" (guild_id, channel_id, user_id, start_time)
+			values (${v.guildId}, ${v.channelId}, ${v.userId}, ${v.startTime})
+			returning *
+			`,
+		).get() as UserLiveSessionRaw | undefined
+
+		if (!liveSessionRaw)
+			throw new Error(
+				'Failed to retrieve newly created user live session',
+			)
+
+		return toUserLiveSession(liveSessionRaw)
+	}
+
+	public endUserLiveSession(
+		v: Pick<UserLiveSession, 'guildId' | 'channelId' | 'userId'> & {
+			now: Date
+		},
+	): UserSession {
+		// first, find the row. if it doesn't exist, throw.
+		const liveSessionRaw = this.stmt(
+			sql`
+			delete from "user_live_sessions"
+			where
+				"guild_id" = ${v.guildId}
+				and "channel_id" = ${v.channelId}
+				and "user_id" = ${v.userId}
+			returning *
+			`,
+		).get() as UserLiveSessionRaw | undefined
+
+		if (!liveSessionRaw) throw new Error('Live session not found')
+
+		const liveSession = toUserLiveSession(liveSessionRaw)
+
+		const sessionRaw = this.stmt(
+			sql`
+			insert into "user_sessions" (guild_id, channel_id, user_id, start_time, end_time)
+			values (${v.guildId}, ${v.channelId}, ${v.userId}, ${liveSession.startTime}, ${dateToUnix(v.now)})
+			returning *
+			`,
+		).get() as UserSessionRaw | undefined
+
+		if (!sessionRaw)
+			throw new Error('Failed to retrieve newly created user session')
+
+		return toUserSession(sessionRaw)
 	}
 
 	public startUserSession(
