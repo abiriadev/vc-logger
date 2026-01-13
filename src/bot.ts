@@ -9,6 +9,7 @@ import {
 	VoiceChannel,
 	type Interaction,
 	VoiceState,
+	ChatInputCommandInteraction,
 } from 'discord.js'
 import { Logger } from 'tslog'
 import { Storage } from './db'
@@ -104,74 +105,76 @@ export class Bot extends Client {
 		if (!interaction.isChatInputCommand()) return
 
 		if (interaction.commandName === 'stats') {
-			const targetUser =
-				interaction.options.getUser('target') || interaction.user
-			const stats = this.storage.getUserStats(
-				targetUser.id,
-				interaction.guildId!,
-			)
+			await this.commandStats(interaction)
+		} else if (interaction.commandName === 'leaderboard') {
+			await this.commandLeaderboard(interaction)
+		}
+	}
 
-			let totalMs = 0
-			const history: Record<string, number> = {} // Date -> Duration ms
+	private async commandStats(interaction: ChatInputCommandInteraction) {
+		const targetUser =
+			interaction.options.getUser('target') || interaction.user
+		const stats = this.storage.getUserStats(
+			targetUser.id,
+			interaction.guildId!,
+		)
 
-			const now = new Date() // Keep 'now' for reference if needed, though getPastDate uses new Date() internally too.
-			const thirtyDaysAgo = getPastDate(30)
+		let totalMs = 0
+		const history: Record<string, number> = {} // Date -> Duration ms
 
-			stats.forEach(s => {
-				const date = new Date(s.start_time)
-				if (date >= thirtyDaysAgo) {
-					const dateStr = formatDateISO(date)
-					if (dateStr) {
-						if (s.end_time) {
-							const duration = s.end_time - s.start_time
-							totalMs += duration
-							history[dateStr] =
-								(history[dateStr] || 0) + duration
-						}
+		const thirtyDaysAgo = getPastDate(30)
+
+		stats.forEach(s => {
+			const date = new Date(s.start_time)
+			if (date >= thirtyDaysAgo) {
+				const dateStr = formatDateISO(date)
+				if (dateStr) {
+					if (s.end_time) {
+						const duration = s.end_time - s.start_time
+						totalMs += duration
+						history[dateStr] = (history[dateStr] || 0) + duration
 					}
 				}
-			})
+			}
+		})
 
-			// Generate "Github-like" calendar with emojis
-			// This is a simplified text representation
-			let calendar = ''
-			for (let i = 29; i >= 0; i--) {
-				const d = getPastDate(i)
-				const dStr = formatDateISO(d)
+		// Generate "Github-like" calendar with emojis
+		// This is a simplified text representation
+		let calendar = ''
+		for (let i = 29; i >= 0; i--) {
+			const d = getPastDate(i)
+			const dStr = formatDateISO(d)
 
-				if (dStr) {
-					const dur = history[dStr] || 0
+			if (dStr) {
+				const dur = history[dStr] || 0
 
-					// Emoji scale based on hours
-					const hours = dur / (1000 * 60 * 60)
-					if (hours === 0) calendar += '⬜'
-					else if (hours < 1) calendar += '🟨'
-					else if (hours < 4) calendar += '🟧'
-					else calendar += '🟥'
-				}
-
-				if (i % 7 === 0 && i !== 0) calendar += '\n' // Break line occasionally for formatting? Or just a line.
+				// Emoji scale based on hours
+				const hours = dur / (1000 * 60 * 60)
+				if (hours === 0) calendar += '⬜'
+				else if (hours < 1) calendar += '🟨'
+				else if (hours < 4) calendar += '🟧'
+				else calendar += '🟥'
 			}
 
-			const totalHours = (totalMs / (1000 * 60 * 60)).toFixed(2)
-
-			await interaction.reply({
-				content: `**Stats for ${targetUser.username}** (Last 30 Days)\nTotal Time: ${totalHours} hours\n\nActivity:\n${calendar}`,
-			})
+			if (i % 7 === 0 && i !== 0) calendar += '\n' // Break line occasionally for formatting? Or just a line.
 		}
 
-		if (interaction.commandName === 'leaderboard') {
-			const lb = this.storage.getGuildLeaderboard(interaction.guildId!)
-			const lines = lb.map((entry, index) => {
-				const hours = (entry.total_duration / (1000 * 60 * 60)).toFixed(
-					1,
-				)
-				return `${index + 1}. <@${entry.user_id}> - ${hours} hrs`
-			})
-			await interaction.reply(
-				`**Leaderboard**\n${lines.join('\n') || 'No data yet.'}`,
-			)
-		}
+		const totalHours = (totalMs / (1000 * 60 * 60)).toFixed(2)
+
+		await interaction.reply({
+			content: `**Stats for ${targetUser.username}** (Last 30 Days)\nTotal Time: ${totalHours} hours\n\nActivity:\n${calendar}`,
+		})
+	}
+
+	private async commandLeaderboard(interaction: ChatInputCommandInteraction) {
+		const lb = this.storage.getGuildLeaderboard(interaction.guildId!)
+		const lines = lb.map((entry, index) => {
+			const hours = (entry.total_duration / (1000 * 60 * 60)).toFixed(1)
+			return `${index + 1}. <@${entry.user_id}> - ${hours} hrs`
+		})
+		await interaction.reply(
+			`**Leaderboard**\n${lines.join('\n') || 'No data yet.'}`,
+		)
 	}
 
 	private async onVoiceStateUpdate(
