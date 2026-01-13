@@ -1,0 +1,12 @@
+services:
+  vc-logger:
+    build: .
+    restart: always
+    environment:
+      - LOG_LEVEL
+      - DISCORD_TOKEN
+      - CLIENT_ID
+      - GUILD_ID
+      - DB_PATH
+    volumes:
+      - ./${HOST_DB_DIR}:/app/db
