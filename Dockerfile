@@ -24,5 +24,5 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 
-ENTRYPOINT ["node", "./dist/index.js"]
+ENTRYPOINT ["node", "--enable-source-maps", "./dist/index.js"]
 
