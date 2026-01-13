@@ -71,10 +71,12 @@ export class Bot extends Client {
 
 		try {
 			this.logger.info('Started refreshing application (/) commands.')
+
 			if (this.config.guildId) {
 				this.logger.info(
 					`Registering commands to specific guild: ${this.config.guildId}`,
 				)
+
 				await rest.put(
 					Routes.applicationGuildCommands(
 						this.config.clientId,
@@ -88,6 +90,7 @@ export class Bot extends Client {
 				this.logger.info(
 					'Registering commands globally (multi-guild support).',
 				)
+
 				await rest.put(
 					Routes.applicationCommands(this.config.clientId),
 					{
@@ -95,6 +98,7 @@ export class Bot extends Client {
 					},
 				)
 			}
+
 			this.logger.info('Successfully reloaded application (/) commands.')
 		} catch (error) {
 			this.logger.error(error)
@@ -104,11 +108,10 @@ export class Bot extends Client {
 	private async onInteraction(interaction: Interaction) {
 		if (!interaction.isChatInputCommand()) return
 
-		if (interaction.commandName === 'stats') {
+		if (interaction.commandName === 'stats')
 			await this.commandStats(interaction)
-		} else if (interaction.commandName === 'leaderboard') {
+		else if (interaction.commandName === 'leaderboard')
 			await this.commandLeaderboard(interaction)
-		}
 	}
 
 	private async commandStats(interaction: ChatInputCommandInteraction) {
