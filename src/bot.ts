@@ -12,6 +12,7 @@ import {
 } from 'discord.js'
 import { Logger } from 'tslog'
 import { Storage } from './db'
+import { formatDateISO, formatDurationHMS, getPastDate } from './utils'
 
 export interface BotConfig {
 	token: string
@@ -113,14 +114,13 @@ export class Bot extends Client {
 			let totalMs = 0
 			const history: Record<string, number> = {} // Date -> Duration ms
 
-			const now = new Date()
-			const thirtyDaysAgo = new Date()
-			thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+			const now = new Date() // Keep 'now' for reference if needed, though getPastDate uses new Date() internally too.
+			const thirtyDaysAgo = getPastDate(30)
 
 			stats.forEach(s => {
 				const date = new Date(s.start_time)
 				if (date >= thirtyDaysAgo) {
-					const dateStr = date.toISOString().split('T')[0]
+					const dateStr = formatDateISO(date)
 					if (dateStr) {
 						if (s.end_time) {
 							const duration = s.end_time - s.start_time
@@ -136,9 +136,8 @@ export class Bot extends Client {
 			// This is a simplified text representation
 			let calendar = ''
 			for (let i = 29; i >= 0; i--) {
-				const d = new Date()
-				d.setDate(d.getDate() - i)
-				const dStr = d.toISOString().split('T')[0]
+				const d = getPastDate(i)
+				const dStr = formatDateISO(d)
 
 				if (dStr) {
 					const dur = history[dStr] || 0
@@ -230,12 +229,7 @@ export class Bot extends Client {
 							channelSession.startTime.getTime()
 
 						// Format duration
-						const seconds = Math.floor((durationMs / 1000) % 60)
-						const minutes = Math.floor(
-							(durationMs / (1000 * 60)) % 60,
-						)
-						const hours = Math.floor(durationMs / (1000 * 60 * 60))
-						const durationStr = `${hours}h ${minutes}m ${seconds}s`
+						const durationStr = formatDurationHMS(durationMs)
 
 						// Log to 'corresponding' text channel
 						if (channel instanceof VoiceChannel) {

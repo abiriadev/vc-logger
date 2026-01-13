@@ -1,4 +1,5 @@
 import type { Client, Snowflake } from 'discord.js'
+import { subDays, format } from 'date-fns'
 
 export type CamelCase<S extends string> =
 	S extends `${infer P1}_${infer P2}${infer P3}`
@@ -15,6 +16,18 @@ export type PartialMap<T, U> = {
 }
 
 export const dateToUnix = (date: Date) => Math.floor(date.getTime() / 1000)
+
+export const getPastDate = (days: number): Date => subDays(new Date(), days)
+
+export const formatDateISO = (date: Date): string => format(date, 'yyyy-MM-dd')
+
+export const formatDurationHMS = (ms: number): string => {
+	const seconds = Math.floor((ms / 1000) % 60)
+	const minutes = Math.floor((ms / (1000 * 60)) % 60)
+	const hours = Math.floor(ms / (1000 * 60 * 60))
+
+	return `${hours}h ${minutes}m ${seconds}s`
+}
 
 export async function fetchFullVoiceChannelMemberState(
 	client: Client,
