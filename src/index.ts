@@ -37,3 +37,14 @@ const bot = new Bot(
 )
 
 bot.login()
+
+const destroy = async () => {
+	logger.info('Gracefully shutting down...')
+
+	await bot.destroy()
+
+	logger.info('Bye')
+}
+
+process.on('SIGINT', destroy)
+process.on('SIGTERM', destroy)
