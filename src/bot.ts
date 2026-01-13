@@ -198,7 +198,7 @@ export class Bot extends Client {
 				guildId,
 				channelId: oldChannelId,
 				userId,
-				now,
+				lastTime: now,
 			})
 
 			// Check if channel is now empty
