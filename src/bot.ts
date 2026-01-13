@@ -12,7 +12,7 @@ import {
 	ChatInputCommandInteraction,
 } from 'discord.js'
 import { Logger } from 'tslog'
-import { Storage } from './db'
+import { Storage, type LeaderboardEntry } from './db'
 import { formatDateISO, formatDurationHMS, getPastDate } from './utils'
 
 export interface BotConfig {
@@ -114,10 +114,16 @@ export class Bot extends Client {
 	private async commandStats(interaction: ChatInputCommandInteraction) {
 		const targetUser =
 			interaction.options.getUser('target') || interaction.user
-		const stats = this.storage.getUserStats(
-			targetUser.id,
-			interaction.guildId!,
-		)
+		let stats: ReturnType<typeof this.storage.getUserStats> = []
+		try {
+			stats = this.storage.getUserStats(
+				targetUser.id,
+				interaction.guildId!,
+			)
+		} catch (error) {
+			this.logger.error('Failed to get user stats', error)
+			return
+		}
 
 		let totalMs = 0
 		const history: Record<string, number> = {} // Date -> Duration ms
@@ -167,7 +173,13 @@ export class Bot extends Client {
 	}
 
 	private async commandLeaderboard(interaction: ChatInputCommandInteraction) {
-		const lb = this.storage.getGuildLeaderboard(interaction.guildId!)
+		let lb: LeaderboardEntry[] = []
+		try {
+			lb = this.storage.getGuildLeaderboard(interaction.guildId!)
+		} catch (error) {
+			this.logger.error('Failed to get leaderboard', error)
+			return
+		}
 		const lines = lb.map((entry, index) => {
 			const hours = (entry.total_duration / (1000 * 60 * 60)).toFixed(1)
 			return `${index + 1}. <@${entry.user_id}> - ${hours} hrs`
@@ -196,12 +208,19 @@ export class Bot extends Client {
 
 		// Handle Leave logic (oldChannelId is set)
 		if (oldChannelId) {
-			this.storage.endUserLiveSession({
-				guildId,
-				channelId: oldChannelId,
-				userId,
-				lastTime: now,
-			})
+			try {
+				this.storage.endUserLiveSession({
+					guildId,
+					channelId: oldChannelId,
+					userId,
+					lastTime: now,
+				})
+			} catch (error) {
+				this.logger.error(
+					`Failed to end user live session for ${userId} in ${oldChannelId}`,
+					error,
+				)
+			}
 
 			// Check if channel is now empty
 			const channel = oldState.channel // Should be available in cache usually
@@ -224,8 +243,17 @@ export class Bot extends Client {
 				}
 
 				if (channel.members.size === 0) {
-					const channelSession =
-						this.storage.endChannelSession(oldChannelId)
+					let channelSession
+					try {
+						channelSession =
+							this.storage.endChannelSession(oldChannelId)
+					} catch (error) {
+						this.logger.error(
+							`Failed to end channel session for ${oldChannelId}`,
+							error,
+						)
+					}
+
 					if (channelSession && channelSession.endTime) {
 						const durationMs =
 							channelSession.endTime.getTime() -
@@ -257,20 +285,31 @@ export class Bot extends Client {
 
 		// Handle Join logic (newChannelId is set)
 		if (newChannelId) {
-			this.storage.startUserLiveSession({
-				guildId,
-				channelId: newChannelId,
-				userId,
-				startTime: now,
-			})
+			try {
+				this.storage.startUserLiveSession({
+					guildId,
+					channelId: newChannelId,
+					userId,
+					startTime: now,
+				})
+			} catch (error) {
+				this.logger.error(
+					`Failed to start user live session for ${userId} in ${newChannelId}`,
+					error,
+				)
+			}
 
 			// Check if channel session needs starting
 			const channel = newState.channel
 			if (channel) {
-				const started = this.storage.startChannelSession(
-					guildId,
-					newChannelId,
-				)
+				try {
+					this.storage.startChannelSession(guildId, newChannelId)
+				} catch (error) {
+					this.logger.error(
+						`Failed to start channel session for ${newChannelId}`,
+						error,
+					)
+				}
 
 				// If we started a new session, or maybe just on every user join?
 				// "logs message on VC join/leave" - User requirement 1.

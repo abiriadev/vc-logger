@@ -379,7 +379,7 @@ export class Storage {
 		return null
 	}
 
-	public getChannelSession(channelId: string) {
+	public getChannelSession(channelId: string): ChannelSession {
 		const raw = this.stmt(
 			sql`
 			select "id", "start_time" from "channel_sessions"
@@ -391,52 +391,48 @@ export class Storage {
 			`,
 		).get() as ChannelSessionRaw | undefined
 
-		if (!raw) {
-			throw new Error('Channel session not found')
-		}
+		if (!raw) throw new Error('Channel session not found')
 
 		return toChannelSession(raw)
 	}
 
 	public startChannelSession(guildId: string, channelId: string): boolean {
-		const existing = this.getChannelSession(channelId)
-
-		if (!existing) {
-			const startTime = Date.now()
-
-			this.stmt(
-				sql`
-				insert into "channel_sessions" ("guild_id", channel_id, start_time)
-				values (${guildId}, ${channelId}, ${startTime})
-				`,
-			).run()
-
-			return true
+		try {
+			this.getChannelSession(channelId)
+			return false
+		} catch (error) {
+			// Session not found, proceed to create
 		}
-		return false
+
+		const startTime = Date.now()
+
+		this.stmt(
+			sql`
+			insert into "channel_sessions" ("guild_id", channel_id, start_time)
+			values (${guildId}, ${channelId}, ${startTime})
+			`,
+		).run()
+
+		return true
 	}
 
 	public endChannelSession(channelId: string) {
 		const existing = this.getChannelSession(channelId)
 
-		if (existing) {
-			const endTime = new Date()
+		const endTime = new Date()
 
-			this.stmt(
-				sql`
-				update "channel_sessions"
-				set "end_time" = ${dateToUnix(endTime)}
-				where "id" = ${existing.id}
-				`,
-			).run()
+		this.stmt(
+			sql`
+			update "channel_sessions"
+			set "end_time" = ${dateToUnix(endTime)}
+			where "id" = ${existing.id}
+			`,
+		).run()
 
-			return {
-				startTime: existing.startTime,
-				endTime,
-			}
+		return {
+			startTime: existing.startTime,
+			endTime,
 		}
-
-		return null
 	}
 
 	public getUserStats(
