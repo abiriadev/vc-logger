@@ -3,44 +3,28 @@ import { Logger } from 'tslog'
 import { Storage } from './db'
 import { Bot, type BotConfig } from './bot'
 import { env } from 'node:process'
+import z from 'zod'
 
-const LOG_LEVEL = env.LOG_LEVEL ? parseInt(env.LOG_LEVEL, 10) : undefined
-
-const logger = new Logger({
-	minLevel: LOG_LEVEL,
+const configSchema = z.object({
+	LOG_LEVEL: z.coerce.number().int(),
+	DISCORD_TOKEN: z.string(),
+	CLIENT_ID: z.string(),
+	GUILD_ID: z.string().optional(),
+	DB_PATH: z.string().default('vc_logger.db'),
 })
 
-if (env['DISCORD_TOKEN'] === undefined) {
-	logger.fatal(
-		'Missing environment variable DISCORD_TOKEN. Please check README.',
-	)
-	process.exit(1)
-}
+const config = configSchema.parse(env)
 
-const DISCORD_TOKEN = env['DISCORD_TOKEN']
-
-if (env['CLIENT_ID'] === undefined) {
-	logger.fatal('Missing environment variable CLIENT_ID. Please check README.')
-	process.exit(1)
-}
-const CLIENT_ID = env['CLIENT_ID']
-
-if (env['GUILD_ID'] === undefined) {
-	logger.fatal('Missing environment variable GUILD_ID. Please check README.')
-	process.exit(1)
-}
-const GUILD_ID = env['GUILD_ID']
-
-const DB_PATH = process.env.DB_PATH || 'vc_logger.db'
+const logger = new Logger({ minLevel: config.LOG_LEVEL })
 
 // Initialize DB
-const storage = new Storage(DB_PATH, logger)
+const storage = new Storage(config.DB_PATH, logger)
 
 // Init Bot
 const botConfig: BotConfig = {
-	token: DISCORD_TOKEN,
-	clientId: CLIENT_ID,
-	guildId: GUILD_ID,
+	token: config.DISCORD_TOKEN,
+	clientId: config.CLIENT_ID,
+	guildId: config.GUILD_ID,
 }
 
 const bot = new Bot(
